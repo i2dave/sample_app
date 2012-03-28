@@ -18,10 +18,25 @@ describe "User pages" do
     describe "pagination" do
       before(:all) { 30.times { FactoryGirl.create(:user) } }
       after(:all)  { User.delete_all }
+			
+			let(:first_page)  { User.paginate(page: 1) }
+      let(:second_page) { User.paginate(page: 2) }
 
       it { should have_link('Next') }
       it { should have_link('2') }			
 			it { should_not have_link('delete') }
+			
+			it "should list the first page of users" do
+        first_page.each do |user|
+          page.should have_selector('li', text: user.name)
+        end
+      end
+
+      it "should not list the second page of users" do
+        second_page.each do |user|
+          page.should_not have_selector('li', text: user.name)
+        end
+      end
 
       describe "as an admin user" do
         let(:admin) { FactoryGirl.create(:admin) }
@@ -42,22 +57,50 @@ describe "User pages" do
           page.should have_selector('li', text: user.name)
         end
       end
+			
+			describe "who tries to delete himself" do
+				let(:admin) { FactoryGirl.create(:admin) }
+				before { delete destroy_user_path(admin) }
+				it "should not change the user count" do
+					expect { destroy_user_path(admin) }.to change(User, :count).by(0)
+				end
+			end
     end
   end
 
-  describe "signup page" do
-    before { visit signup_path }
+  describe "signup page" do		
+		describe "visited by authenticated user" do
+			let(:user) { FactoryGirl.create(:user) }
 
-    it { should have_selector('h1',    text: 'Sign up') }
-    it { should have_selector('title', text: full_title('Sign up')) }
+			before do
+				sign_in user
+				get new_user_path			
+			end
+			specify { response.should redirect_to(root_path) }
+		end
+		
+		describe "visited by unauthenticated user" do
+			before { visit signup_path }
+			it { should have_selector('h1',    text: 'Sign up') }
+			it { should have_selector('title', text: full_title('Sign up')) }
+		end
   end
 	
 	describe "profile page" do
     let(:user) { FactoryGirl.create(:user) }
+    let!(:m1) { FactoryGirl.create(:micropost, user: user, content: "Foo") }
+    let!(:m2) { FactoryGirl.create(:micropost, user: user, content: "Bar") }
+
     before { visit user_path(user) }
 
     it { should have_selector('h1',    text: user.name) }
     it { should have_selector('title', text: user.name) }
+
+    describe "microposts" do
+      it { should have_content(m1.content) }
+      it { should have_content(m2.content) }
+      it { should have_content(user.microposts.count) }
+    end
   end
 	
 	describe "signup" do
