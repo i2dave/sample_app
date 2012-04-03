@@ -42,5 +42,55 @@ describe "Micropost pages" do
         expect { click_link "delete" }.should change(Micropost, :count).by(-1)
       end
     end
+		
+		describe "as incorrect user" do
+			let!(:incorrect_user) { FactoryGirl.create(:user, name: "incorrect", email: "incorrect@test.com", password: "wrong_user") }
+      before { get user_path(incorrect_user) }
+
+      it { should_not have_selector('td', text: "delete") }
+    end
   end
+	
+	describe "micropost count" do
+		before {visit root_path}
+		
+		context "when one micropost" do
+			it { should have_selector('span.microposts', text: "#{user.microposts.limit(1).count} micropost") }
+		end
+		
+		context "when more than one microposts" do
+			it { should have_selector('span.microposts', text: "#{user.microposts.count} microposts") }
+		end
+				
+		context "when zero microposts" do
+			it { should have_selector('span.microposts', text: "#{user.microposts.limit(0).count} microposts") }
+		end
+	end
+	
+	describe "pagination" do
+		before(:all) do 
+			visit root_path
+			60.times { FactoryGirl.create(:micropost, user: user, content: "Lorem ipsum") }
+		end
+		
+		after(:all)  { user.microposts.delete_all }
+		
+		let(:first_page)  { user.microposts.paginate(page: 1) }
+    let(:second_page) { user.microposts.paginate(page: 2) } 
+		
+		it { should have_link('Next') }
+		it { should have_link('2') }
+		
+		it "should list the first page of microposts" do
+			first_page.each do |micropost|
+				page.should have_selector('span.content', text: micropost.content)
+			end
+		end
+		
+		it "should list the second page of microposts" do
+			second_page.each do |micropost|
+				page.should have_selector('span.content', text: micropost.content)
+			end
+		end		
+	end
 end
